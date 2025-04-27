@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIT-Datei Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fit-file-parser/1.9.5/fit-parser.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .drop-area {
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .drop-area:hover {
+            background-color: #f0f8ff;
+        }
+        .summary-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .summary-item {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .summary-label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .chart-container {
+            margin-top: 30px;
+            height: 300px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #file-name {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .tabs {
+            display: flex;
+            margin-top: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FIT-Datei Analyzer</h1>
+        
+        <div class="drop-area" id="drop-area">
+            <p>Ziehe deine .fit Datei hierher oder klicke zum Auswählen</p>
+            <input type="file" id="file-input" style="display: none;" accept=".fit">
+            <button id="select-file">Datei auswählen</button>
+            <p id="file-name"></p>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analysiere Datei...</p>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="tabs">
+                <div class="tab active" data-tab="summary">Zusammenfassung</div>
+                <div class="tab" data-tab="heart-rate">Herzfrequenz</div>
+                <div class="tab" data-tab="elevation">Höhenprofil</div>
+                <div class="tab" data-tab="temperature">Temperatur</div>
+            </div>
+            
+            <div class="tab-content active" id="summary">
+                <div class="summary-card">
+                    <h3>Aktivitätsübersicht</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Aktivitätstyp:</span>
+                        <span id="activity-type">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Datum:</span>
+                        <span id="activity-date">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Startzeit:</span>
+                        <span id="start-time">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Trainingsdauer:</span>
+                        <span id="duration">-</span>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Herzfrequenz</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Durchschnitt:</span>
+                        <span id="avg-hr">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Maximum:</span>
+                        <span id="max-hr">-</span>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Höhendaten</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Gesamtaufstieg:</span>
+                        <span id="total-ascent">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Gesamtabstieg:</span>
+                        <span id="total-descent">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Minimale Höhe:</span>
+                        <span id="min-elevation">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Maximale Höhe:</span>
+                        <span id="max-elevation">-</span>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <h3>Temperatur</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Durchschnitt:</span>
+                        <span id="avg-temp">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Minimum:</span>
+                        <span id="min-temp">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Maximum:</span>
+                        <span id="max-temp">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="heart-rate">
+                <div class="chart-container">
+                    <canvas id="hr-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="elevation">
+                <div class="chart-container">
+                    <canvas id="elevation-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="temperature">
+                <div class="chart-container">
+                    <canvas id="temp-chart"></canvas>
+                </div>
+            </div>
+
+            <button id="download-button" style="display: none;">Zusammenfassung herunterladen</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elemente
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const selectButton = document.getElementById('select-file');
+        const fileName = document.getElementById('file-name');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const downloadButton = document.getElementById('download-button');
+        
+        // Charts
+        let hrChart, elevationChart, tempChart;
+        
+        // Aktivitätsdaten
+        let activityData = {
+            records: [],
+            sessions: [],
+            laps: [],
+            fileId: null
+        };
+        
+        // Event-Listener für Drag & Drop
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = '#2ecc71';
+        });
+        
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.style.borderColor = '#3498db';
+        });
+        
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = '#3498db';
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Event-Listener für Dateiauswahldialog
+        selectButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        // Tab-Funktionalität
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Download-Button Event-Listener
+        downloadButton.addEventListener('click', generateSummaryCSV);
+        
+        // Funktion zum Verarbeiten der ausgewählten Datei
+        function handleFile(file) {
+            if (file.name.endsWith('.fit')) {
+                fileName.textContent = file.name;
+                loading.style.display = 'block';
+                results.style.display = 'none';
+                
+                // FIT-Datei einlesen
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    try {
+                        parseAndAnalyzeFitFile(content);
+                    } catch (error) {
+                        alert('Fehler beim Parsen der FIT-Datei: ' + error.message);
+                        loading.style.display = 'none';
+                    }
+                };
+                
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Bitte wähle eine .fit Datei aus.');
+            }
+        }
+        
+        // FIT-Datei parsen und analysieren
+        function parseAndAnalyzeFitFile(content) {
+            const parser = new FitParser({
+                force: true,
+                speedUnit: 'km/h',
+                lengthUnit: 'm',
+                temperatureUnit: 'celsius',
+                elapsedRecordField: true,
+                mode: 'list'
+            });
+            
+            parser.parse(content, function(error, data) {
+                if (error) {
+                    alert('Fehler beim Parsen der FIT-Datei: ' + error);
+                    loading.style.display = 'none';
+                    return;
+                }
+                
+                // Daten extrahieren
+                activityData.records = data.records || [];
+                activityData.sessions = data.sessions || [];
+                activityData.laps = data.laps || [];
+                activityData.fileId = data.file_id || null;
+                
+                // Zusammenfassung anzeigen
+                displaySummary();
+                
+                // Charts erstellen
+                createHeartRateChart();
+                createElevationChart();
+                createTemperatureChart();
+                
+                // Ergebnisse anzeigen
+                loading.style.display = 'none';
+                results.style.display = 'block';
+                downloadButton.style.display = 'block';
+            });
+        }
+        
+        // Zusammenfassung anzeigen
+        function displaySummary() {
+            const session = activityData.sessions[0] || {};
+            const startTime = session.start_time ? new Date(session.start_time) : null;
+            
+            // Aktivitätstyp
+            document.getElementById('activity-type').textContent = getActivityType(session.sport);
+            
+            // Datum und Startzeit
+            if (startTime) {
+                document.getElementById('activity-date').textContent = formatDate(startTime);
+                document.getElementById('start-time').textContent = formatTime(startTime);
+            }
+            
+            // Trainingsdauer
+            const durationInSeconds = session.total_elapsed_time || 0;
+            document.getElementById('duration').textContent = formatDuration(durationInSeconds);
+            
+            // Herzfrequenzdaten
+            const heartRateData = getHeartRateData();
+            document.getElementById('avg-hr').textContent = heartRateData.avg ? `${Math.round(heartRateData.avg)} bpm` : '-';
+            document.getElementById('max-hr').textContent = heartRateData.max ? `${heartRateData.max} bpm` : '-';
+            
+            // Höhendaten
+            document.getElementById('total-ascent').textContent = session.total_ascent ? `${session.total_ascent} m` : '-';
+            document.getElementById('total-descent').textContent = session.total_descent ? `${session.total_descent} m` : '-';
+            
+            const elevationData = getElevationData();
+            document.getElementById('min-elevation').textContent = elevationData.min !== Infinity ? `${Math.round(elevationData.min)} m` : '-';
+            document.getElementById('max-elevation').textContent = elevationData.max !== -Infinity ? `${Math.round(elevationData.max)} m` : '-';
+            
+            // Temperaturdaten
+            const tempData = getTemperatureData();
+            document.getElementById('avg-temp').textContent = tempData.avg ? `${tempData.avg.toFixed(1)} °C` : '-';
+            document.getElementById('min-temp').textContent = tempData.min !== Infinity ? `${tempData.min.toFixed(1)} °C` : '-';
+            document.getElementById('max-temp').textContent = tempData.max !== -Infinity ? `${tempData.max.toFixed(1)} °C` : '-';
+        }
+        
+        // Herzfrequenz-Chart erstellen
+        function createHeartRateChart() {
+            const ctx = document.getElementById('hr-chart').getContext('2d');
+            
+            // Alte Chart zerstören, falls vorhanden
+            if (hrChart) {
+                hrChart.destroy();
+            }
+            
+            const data = getChartDataForHeartRate();
+            
+            hrChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Herzfrequenz (bpm)',
+                        data: data.values,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'bpm'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Zeit'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Höhenprofil-Chart erstellen
+        function createElevationChart() {
+            const ctx = document.getElementById('elevation-chart').getContext('2d');
+            
+            // Alte Chart zerstören, falls vorhanden
+            if (elevationChart) {
+                elevationChart.destroy();
+            }
+            
+            const data = getChartDataForElevation();
+            
+            elevationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Höhe (m)',
+                        data: data.values,
+                        borderColor: '#2980b9',
+                        backgroundColor: 'rgba(41, 128, 185, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Höhe (m)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Zeit'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Temperatur-Chart erstellen
+        function createTemperatureChart() {
+            const ctx = document.getElementById('temp-chart').getContext('2d');
+            
+            // Alte Chart zerstören, falls vorhanden
+            if (tempChart) {
+                tempChart.destroy();
+            }
+            
+            const data = getChartDataForTemperature();
+            
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Temperatur (°C)',
+                        data: data.values,
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: '°C'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Zeit'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Herzfrequenzdaten sammeln
+        function getHeartRateData() {
+            let sum = 0;
+            let count = 0;
+            let max = 0;
+            
+            activityData.records.forEach(record => {
+                if (record.heart_rate) {
+                    sum += record.heart_rate;
+                    count++;
+                    
+                    if (record.heart_rate > max) {
+                        max = record.heart_rate;
+                    }
+                }
+            });
+            
+            return {
+                avg: count > 0 ? sum / count : null,
+                max: max > 0 ? max : null
+            };
+        }
+        
+        // Höhendaten sammeln
+        function getElevationData() {
+            let min = Infinity;
+            let max = -Infinity;
+            
+            activityData.records.forEach(record => {
+                if (record.altitude || record.enhanced_altitude) {
+                    const altitude = record.enhanced_altitude || record.altitude;
+                    
+                    if (altitude < min) {
+                        min = altitude;
+                    }
+                    
+                    if (altitude > max) {
+                        max = altitude;
+                    }
+                }
+            });
+            
+            return {
+                min: min,
+                max: max
+            };
+        }
+        
+        // Temperaturdaten sammeln
+        function getTemperatureData() {
+            let sum = 0;
+            let count = 0;
+            let min = Infinity;
+            let max = -Infinity;
+            
+            activityData.records.forEach(record => {
+                if (record.temperature) {
+                    sum += record.temperature;
+                    count++;
+                    
+                    if (record.temperature < min) {
+                        min = record.temperature;
+                    }
+                    
+                    if (record.temperature > max) {
+                        max = record.temperature;
+                    }
+                }
+            });
+            
+            return {
+                avg: count > 0 ? sum / count : null,
+                min: min,
+                max: max
+            };
+        }
+        
+        // Herzfrequenz-Chart-Daten sammeln
+        function getChartDataForHeartRate() {
+            const values = [];
+            const labels = [];
+            const startTime = activityData.sessions[0]?.start_time ? new Date(activityData.sessions[0].start_time) : null;
+            
+            // Nur jeden X-ten Datenpunkt verwenden, um die Leistung zu verbessern
+            const samplingRate = Math.max(1, Math.floor(activityData.records.length / 100));
+            
+            for (let i = 0; i < activityData.records.length; i += samplingRate) {
+                const record = activityData.records[i];
+                
+                if (record.heart_rate) {
+                    values.push(record.heart_rate);
+                    
+                    if (startTime && record.timestamp) {
+                        const time = new Date(record.timestamp);
+                        const elapsedMinutes = (time - startTime) / (1000 * 60);
+                        labels.push(formatElapsedTime(elapsedMinutes));
+                    } else {
+                        labels.push('');
+                    }
+                }
+            }
+            
+            return { values, labels };
+        }
+        
+        // Höhenprofil-Chart-Daten sammeln
+        function getChartDataForElevation() {
+            const values = [];
+            const labels = [];
+            const startTime = activityData.sessions[0]?.start_time ? new Date(activityData.sessions[0].start_time) : null;
+            
+            // Nur jeden X-ten Datenpunkt verwenden, um die Leistung zu verbessern
+            const samplingRate = Math.max(1, Math.floor(activityData.records.length / 100));
+            
+            for (let i = 0; i < activityData.records.length; i += samplingRate) {
+                const record = activityData.records[i];
+                
+                if (record.altitude || record.enhanced_altitude) {
+                    const altitude = record.enhanced_altitude || record.altitude;
+                    values.push(altitude);
+                    
+                    if (startTime && record.timestamp) {
+                        const time = new Date(record.timestamp);
+                        const elapsedMinutes = (time - startTime) / (1000 * 60);
+                        labels.push(formatElapsedTime(elapsedMinutes));
+                    } else {
+                        labels.push('');
+                    }
+                }
+            }
+            
+            return { values, labels };
+        }
+        
+        // Temperatur-Chart-Daten sammeln
+        function getChartDataForTemperature() {
+            const values = [];
+            const labels = [];
+            const startTime = activityData.sessions[0]?.start_time ? new Date(activityData.sessions[0].start_time) : null;
+            
+            // Nur jeden X-ten Datenpunkt verwenden, um die Leistung zu verbessern
+            const samplingRate = Math.max(1, Math.floor(activityData.records.length / 100));
+            
+            for (let i = 0; i < activityData.records.length; i += samplingRate) {
+                const record = activityData.records[i];
+                
+                if (record.temperature) {
+                    values.push(record.temperature);
+                    
+                    if (startTime && record.timestamp) {
+                        const time = new Date(record.timestamp);
+                        const elapsedMinutes = (time - startTime) / (1000 * 60);
+                        labels.push(formatElapsedTime(elapsedMinutes));
+                    } else {
+                        labels.push('');
+                    }
+                }
+            }
+            
+            return { values, labels };
+        }
+        
+        // CSV-Zusammenfassung generieren und herunterladen
+        function generateSummaryCSV() {
+            const session = activityData.sessions[0] || {};
+            const startTime = session.start_time ? new Date(session.start_time) : null;
+            const heartRateData = getHeartRateData();
+            const elevationData = getElevationData();
+            const tempData = getTemperatureData();
+            
+            let csv = 'Kategorie,Wert\n';
+            csv += `Aktivitätstyp,${getActivityType(session.sport)}\n`;
+            
+            if (startTime) {
+                csv += `Datum,${formatDate(startTime)}\n`;
+                csv += `Startzeit,${formatTime(startTime)}\n`;
+            }
+            
+            const durationInSeconds = session.total_elapsed_time || 0;
+            csv += `Trainingsdauer,${formatDuration(durationInSeconds)}\n`;
+            
+            csv += `Durchschnittliche Herzfrequenz,${heartRateData.avg ? Math.round(heartRateData.avg) + ' bpm' : '-'}\n`;
+            csv += `Maximale Herzfrequenz,${heartRateData.max ? heartRateData.max + ' bpm' : '-'}\n`;
+            
+            csv += `Gesamtaufstieg,${session.total_ascent ? session.total_ascent + ' m' : '-'}\n`;
+            csv += `Gesamtabstieg,${session.total_descent ? session.total_descent + ' m' : '-'}\n`;
+            csv += `Minimale Höhe,${elevationData.min !== Infinity ? Math.round(elevationData.min) + ' m' : '-'}\n`;
+            csv += `Maximale Höhe,${elevationData.max !== -Infinity ? Math.round(elevationData.max) + ' m' : '-'}\n`;
+            
+            csv += `Durchschnittstemperatur,${tempData.avg ? tempData.avg.toFixed(1) + ' °C' : '-'}\n`;
+            csv += `Minimale Temperatur,${tempData.min !== Infinity ? tempData.min.toFixed(1) + ' °C' : '-'}\n`;
+            csv += `Maximale Temperatur,${tempData.max !== -Infinity ? tempData.max.toFixed(1) + ' °C' : '-'}\n`;
+            
+            // Dateinamen erstellen
+            const date = startTime ? formatDateForFilename(startTime) : 'unknown-date';
+            const fileName = `training-summary-${date}.csv`;
+            
+            // CSV-Datei herunterladen
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (navigator.msSaveBlob) { // IE 10+
+                navigator.msSaveBlob(blob, fileName);
+            } else {
+                const url = URL.createObjectURL(blob);
+                link.href = url;
+                link.setAttribute('download', fileName);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+        
+        // Hilfsfunktionen
+        function getActivityType(sport) {
+            const sportTypes = {
+                0: 'Andere',
+                1: 'Laufen',
+                2: 'Radfahren',
+                3: 'Übergang',
+                4: 'Fitness',
+                5: 'Schwimmen',
+                6: 'Basketball',
+                7: 'Golf',
+                8: 'Wandern',
+                9: 'Rudern',
+                10: 'Skifahren',
+                11: 'Snowboarden',
+                12: 'Skaten',
+                13: 'Skateboarden',
+                14: 'Surfen',
+                15: 'Wakeboarden',
+                16: 'Wasserski',
+                17: 'Krafttraining',
+                18: 'Crosstraining',
+                19: 'Training',
+                20: 'Tennis',
+                21: 'Stand Up Paddeln',
+                22: 'Trail Running',
+                23: 'Freizeitsport',
+                24: 'Paddelboard',
+                25: 'Fly Fishing',
+                26: 'Kitesurfing',
+                27: 'Segeln',
+                28: 'Ice Skating',
+                29: 'Ski Touring',
+                30: 'Sledding',
+                31: 'Snowshoeing',
+                32: 'Cross Country Skiing',
+                33: 'Mountaineering',
+                34: 'Trekking',
+                35: 'Multisport',
+                36: 'Klettern',
+                37: 'Pilates',
+                38: 'Yoga',
+                39: 'Spazieren'
+            };
+            
+            return sportTypes[sport] || 'Unbekannt';
+        }
+        
+        function formatDate(date) {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString('de-DE', options);
+        }
+        
+        function formatTime(date) {
+            return date.toLocaleTimeString('de-DE');
+        }
+        
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            
+            let result = '';
+            
+            if (hours > 0) {
+                result += hours + ' Std. ';
+            }
+            
+            if (minutes > 0 || hours > 0) {
+                result += minutes + ' Min. ';
+            }
+            
+            result += remainingSeconds + ' Sek.';
+            
+            return result;
+        }
+        
+        function formatElapsedTime(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.floor(minutes % 60);
+            
+            if (hours > 0) {
+                return `${hours}:${mins.toString().padStart(2, '0')}`;
+            } else {
+                return `${mins}m`;
+            }
+        }
+        
+        function formatDateForFilename(date) {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            
+            return `${year}-${month}-${day}`;
+        }
+    </script>
+</body>
+</html>
